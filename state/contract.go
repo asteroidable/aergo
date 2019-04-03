@@ -101,6 +101,13 @@ func (st *ContractState) SetData(key, value []byte) error {
 	return nil
 }
 
+// SetDataUpdate store key and value pair and returns existence of the key
+func (st *ContractState) SetDataUpdate(key, value []byte) (bool, error) {
+	check := st.HasKey(key)
+	st.storage.put(newValueEntry(types.GetHashID(key), value))
+	return check, nil
+}
+
 // GetData returns the value corresponding to the key from the buffered storage.
 func (st *ContractState) GetData(key []byte) ([]byte, error) {
 	id := types.GetHashID(key)
