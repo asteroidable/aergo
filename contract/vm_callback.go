@@ -65,6 +65,9 @@ func LuaSetDB(L *LState, service *C.int, key *C.char, value *C.char) C.int {
 		luaPushStr(L, "[System.LuaSetDB] set not permitted in query")
 		return -1
 	}
+	if stateSet.curContract.callState.ctrState.HasKey([]byte(C.GoString(key))) {
+		logger.Debug().Str("key", C.GoString(key)).Msg("Check existence of key")
+	}
 	val := []byte(C.GoString(value))
 	if err := stateSet.curContract.callState.ctrState.SetData([]byte(C.GoString(key)), val); err != nil {
 		luaPushStr(L, err.Error())
