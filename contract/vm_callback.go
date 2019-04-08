@@ -15,12 +15,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/aergoio/aergo/internal/common"
 	"index/suffixarray"
 	"math/big"
 	"regexp"
 	"strings"
 	"unsafe"
+
+	"github.com/aergoio/aergo/internal/common"
 
 	luacUtil "github.com/aergoio/aergo/cmd/aergoluac/util"
 	"github.com/aergoio/aergo/contract/name"
@@ -65,9 +66,10 @@ func LuaSetDB(L *LState, service *C.int, key *C.char, value *C.char) C.int {
 		luaPushStr(L, "[System.LuaSetDB] set not permitted in query")
 		return -1
 	}
-	if stateSet.curContract.callState.ctrState.HasKey([]byte(C.GoString(key))) {
-		logger.Debug().Str("key", C.GoString(key)).Msg("Check existence of key")
-	}
+
+	keyExists := stateSet.curContract.callState.ctrState.HasKey([]byte(C.GoString(key)))
+	logger.Debug().Str("key", C.GoString(key)).Bool("exists", keyExists).Msg("Check existence of key")
+
 	val := []byte(C.GoString(value))
 	if err := stateSet.curContract.callState.ctrState.SetData([]byte(C.GoString(key)), val); err != nil {
 		luaPushStr(L, err.Error())

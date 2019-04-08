@@ -3,6 +3,7 @@ package state
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/aergoio/aergo-lib/db"
 	"github.com/aergoio/aergo/types"
@@ -12,7 +13,7 @@ import (
 var chainStateDB *ChainStateDB
 var stateDB *StateDB
 
-func initTest(t *testing.T) {
+func initTest(t assert.TestingT) {
 	chainStateDB = NewChainStateDB()
 	_ = chainStateDB.Init(string(db.BadgerImpl), "test", nil, false)
 	stateDB = chainStateDB.GetStateDB()
@@ -293,4 +294,63 @@ func TestContractStateRollback(t *testing.T) {
 	contractState.Rollback(Snapshot(0))
 	res, _ = contractState.GetData(testKey)
 	assert.Nil(t, res)
+}
+
+func BenchmarkContractStateKeyCheck(b *testing.B) {
+	count := 10000
+	benchmarks := []struct {
+		name     string
+		count    int
+		keyCheck bool
+		repeat   int
+	}{
+		{"True.0", count, true, 0},
+		{"True.1", count, true, 1},
+		{"True.2", count, true, 2},
+		{"True.3", count, true, 3},
+		{"False.0", count, false, 0},
+		{"False.1", count, false, 1},
+		{"False.2", count, false, 2},
+		{"False.3", count, false, 3},
+	}
+
+	testAddress := []byte("test_address")
+	testValue := []byte("test_value")
+	for _, bm := range benchmarks {
+		initTest(b)
+		b.Run(bm.name, func(b *testing.B) {
+			b.N = bm.count
+			repeat := bm.repeat
+			if repeat == 0 {
+				repeat = 1
+			}
+			laptime := []time.Time{}
+			for x := 0; x < repeat; x++ {
+				laptime = append(laptime, time.Now())
+				contractState, err := stateDB.OpenContractStateAccount(types.ToAccountID(testAddress))
+				assert.NoError(b, err, "could not open contract state")
+				laptime = append(laptime, time.Now())
+				for i := 0; i < bm.count; i++ {
+					key := []byte("key_" + string(i))
+					if bm.keyCheck {
+						_ = contractState.HasKey(key)
+					}
+					_ = contractState.SetData(key, testValue)
+				}
+				laptime = append(laptime, time.Now())
+				if bm.repeat > 0 {
+					stateDB.Update()
+					stateDB.Commit()
+				}
+				laptime = append(laptime, time.Now())
+				b.Logf("(time) open: %v ns / data: %v ns / commit: %v ns",
+					laptime[1].Sub(laptime[0]).Nanoseconds(),
+					laptime[2].Sub(laptime[1]).Nanoseconds(),
+					laptime[3].Sub(laptime[2]).Nanoseconds())
+				stateDB.StageContractState(contractState)
+			}
+		})
+		deinitTest()
+	}
+
 }
